@@ -1,52 +1,83 @@
 #!/bin/sh
 
+# Root filesystem directory
 rootfs_dir=$(pwd)
 arch=$(uname -m)
-export PATH="$PATH:~/.local/usr/bin"
+export PATH="$PATH:$HOME/.local/usr/bin"
+
+# Configuration
 MAX_RETRIES=50
 TIMEOUT=1
 UBUNTU_VERSION=22.04
+UBUNTU_BASE_URL="http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release"
+PROOT_URL="https://raw.githubusercontent.com/foxytouxxx/freeroot/main"
 
+# Function to install Ubuntu
 install_ubuntu() {
+  echo "Downloading Ubuntu rootfs..."
   wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O /tmp/rootfs.tar.gz \
-    "http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release/ubuntu-base-$UBUNTU_VERSION-base-${arch_alt}.tar.gz"
+    "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-${arch_alt}.tar.gz"
+  
+  echo "Extracting rootfs to $rootfs_dir..."
   tar -xf /tmp/rootfs.tar.gz -C "$rootfs_dir"
 }
 
+# Function to install proot
 install_proot() {
+  echo "Installing proot..."
   mkdir -p "$rootfs_dir/usr/local/bin"
-  wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O "$rootfs_dir/usr/local/bin/proot" "https://raw.githubusercontent.com/foxytouxxx/freeroot/main/proot-${arch}"
+  wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O "$rootfs_dir/usr/local/bin/proot" \
+    "$PROOT_URL/proot-${arch}"
 
-  while [ ! -s "$rootfs_dir/usr/local/bin/proot" ]; do
-    rm -rf "$rootfs_dir/usr/local/bin/proot"
-    wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O "$rootfs_dir/usr/local/bin/proot" "https://raw.githubusercontent.com/foxytouxxx/freeroot/main/proot-${arch}"
+  retry_count=0
+  while [ ! -s "$rootfs_dir/usr/local/bin/proot" ] && [ "$retry_count" -lt "$MAX_RETRIES" ]; do
+    echo "Retrying proot download... Attempt $((retry_count + 1))"
+    rm -f "$rootfs_dir/usr/local/bin/proot"
+    wget --tries=1 --timeout="$TIMEOUT" --no-hsts -O "$rootfs_dir/usr/local/bin/proot" \
+      "$PROOT_URL/proot-${arch}"
     sleep 1
+    retry_count=$((retry_count + 1))
   done
+
+  if [ ! -s "$rootfs_dir/usr/local/bin/proot" ]; then
+    echo "Failed to download proot after $MAX_RETRIES attempts."
+    exit 1
+  fi
 
   chmod 755 "$rootfs_dir/usr/local/bin/proot"
 }
 
+# Function to configure resolv.conf
 configure_resolv() {
-  printf "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" > "$rootfs_dir/etc/resolv.conf"
+  echo "Configuring DNS resolv.conf..."
+  cat > "$rootfs_dir/etc/resolv.conf" <<EOF
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOF
 }
 
-if [ "$arch" = "x86_64" ]; then
-  arch_alt=amd64
-elif [ "$arch" = "aarch64" ]; then
-  arch_alt=arm64
-else
-  printf "Unsupported CPU architecture: %s\n" "$arch"
-  exit 1
-fi
+# Validate architecture
+case "$arch" in
+  x86_64) arch_alt=amd64 ;;
+  aarch64) arch_alt=arm64 ;;
+  *) echo "Unsupported CPU architecture: $arch"; exit 1 ;;
+esac
 
+# Perform installation if not already completed
 if [ ! -e "$rootfs_dir/.installed" ]; then
   install_ubuntu
   install_proot
   configure_resolv
   touch "$rootfs_dir/.installed"
-  printf "Mission Completed\n"
+  echo "Installation complete."
 fi
 
-"$rootfs_dir/usr/local/bin/proot" \
+# Run proot
+echo "Starting proot..."
+exec "$rootfs_dir/usr/local/bin/proot" \
   --rootfs="$rootfs_dir" \
-  -0 -w "/root" -b /dev -b /sys -b /proc -b /etc/resolv.conf --kill-on-exit
+  -0 -w "/root" \
+  -b /dev -b /sys -b /proc -b /etc/resolv.conf \
+  --kill-on-exit
