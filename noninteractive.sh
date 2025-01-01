@@ -9,7 +9,7 @@ UBUNTU_VERSION=22.04
 
 install_ubuntu() {
   wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O /tmp/rootfs.tar.gz \
-    "http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release/ubuntu-base-$UBUNTU_VERSION.4-base-${arch_alt}.tar.gz"
+    "http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release/ubuntu-base-$UBUNTU_VERSION-base-${arch_alt}.tar.gz"
   tar -xf /tmp/rootfs.tar.gz -C "$rootfs_dir"
 }
 
