@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Root filesystem directory
-rootfs_dir=$(pwd)
+rootfs_dir=$(pwd)/rootfs
 arch=$(uname -m)
 export PATH="$PATH:$HOME/.local/usr/bin"
 
@@ -18,10 +18,12 @@ install_ubuntu() {
   wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O /tmp/rootfs.tar.gz \
     "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-${arch_alt}.tar.gz"
   
+  echo "Creating rootfs directory at $rootfs_dir..."
+  mkdir -p "$rootfs_dir"
+
   echo "Extracting rootfs to $rootfs_dir..."
   tar -xf /tmp/rootfs.tar.gz -C "$rootfs_dir"
 }
-
 # Function to install proot
 install_proot() {
   echo "Installing proot..."
@@ -76,8 +78,11 @@ fi
 
 # Run proot
 echo "Starting proot..."
+
+command_to_run=${1:-/bin/sh}
 exec "$rootfs_dir/usr/local/bin/proot" \
   --rootfs="$rootfs_dir" \
   -0 -w "/root" \
   -b /dev -b /sys -b /proc -b /etc/resolv.conf \
-  --kill-on-exit
+  --kill-on-exit \
+  "$command_to_run"
