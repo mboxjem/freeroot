@@ -11,18 +11,15 @@ on:
         required: true
         default: '22.04' # You can set a default version
 
-env:
-  ROOTFS_DIR: "./rootfs"
-  UBUNTU_VERSION: ${{ github.event.inputs.ubuntu_version }}
-  UBUNTU_BASE_URL: "http://cdimage.ubuntu.com/ubuntu-base/releases/${{ env.UBUNTU_VERSION }}/release"
-  PROOT_URL: "https://raw.githubusercontent.com/mboxjem/freeroot/main"
-  ARCH: "$(uname -m)"
-  ARCH_ALT: ${{ steps.set_arch.outputs.arch_alt }}
-  OUTPUT_TAR: "proot-ubuntu-${{ env.UBUNTU_VERSION }}-${{ env.ARCH_ALT }}.tar.gz"
-
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      ROOTFS_DIR: "./rootfs"
+      UBUNTU_VERSION: ${{ github.event.inputs.ubuntu_version }}
+      UBUNTU_BASE_URL: "http://cdimage.ubuntu.com/ubuntu-base/releases/${{ github.event.inputs.ubuntu_version }}/release"
+      PROOT_URL: "https://raw.githubusercontent.com/mboxjem/freeroot/main"
 
     steps:
     - name: Checkout repository
@@ -49,6 +46,7 @@ jobs:
     - name: Set Architecture
       id: set_arch
       run: |
+        ARCH=$(uname -m)
         case "$ARCH" in
           x86_64) echo "::set-output name=arch_alt::amd64" ;;
           aarch64) echo "::set-output name=arch_alt::arm64" ;;
@@ -70,31 +68,31 @@ jobs:
       run: |
         echo "Downloading Ubuntu rootfs..."
         wget --tries=50 --timeout=1 --no-hsts -O /tmp/rootfs.tar.gz \
-          "${{ env.UBUNTU_BASE_URL }}/ubuntu-base-${{ env.UBUNTU_VERSION }}-base-${{ env.ARCH_ALT }}.tar.gz"
+          "${{ env.UBUNTU_BASE_URL }}/ubuntu-base-${{ env.UBUNTU_VERSION }}-base-${{ steps.set_arch.outputs.arch_alt }}.tar.gz"
 
-        echo "Creating rootfs directory at $ROOTFS_DIR..."
-        mkdir -p "$ROOTFS_DIR"
+        echo "Creating rootfs directory at ${{ env.ROOTFS_DIR }}..."
+        mkdir -p "${{ env.ROOTFS_DIR }}"
 
-        echo "Extracting rootfs to $ROOTFS_DIR..."
-        tar -xf /tmp/rootfs.tar.gz -C "$ROOTFS_DIR"
+        echo "Extracting rootfs to ${{ env.ROOTFS_DIR }}..."
+        tar -xf /tmp/rootfs.tar.gz -C "${{ env.ROOTFS_DIR }}"
 
     - name: Install proot
       run: |
         echo "Downloading proot binary for architecture $ARCH..."
-        wget --tries=50 --timeout=1 --no-hsts -O "$ROOTFS_DIR/usr/local/bin/proot" \
-          "$PROOT_URL/proot-${{ env.ARCH }}"
-        chmod 755 "$ROOTFS_DIR/usr/local/bin/proot"
+        wget --tries=50 --timeout=1 --no-hsts -O "${{ env.ROOTFS_DIR }}/usr/local/bin/proot" \
+          "${{ env.PROOT_URL }}/proot-${ARCH}"
+        chmod 755 "${{ env.ROOTFS_DIR }}/usr/local/bin/proot"
 
     - name: Configure resolv.conf
       run: |
         echo "Configuring DNS resolv.conf..."
         echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
-          > "$ROOTFS_DIR/etc/resolv.conf"
+          > "${{ env.ROOTFS_DIR }}/etc/resolv.conf"
 
     - name: Install packages inside PRoot
       run: |
-        ./rootfs/usr/local/bin/proot \
-          --rootfs="$ROOTFS_DIR" \
+        "${{ env.ROOTFS_DIR }}/usr/local/bin/proot" \
+          --rootfs="${{ env.ROOTFS_DIR }}" \
           -0 -w "/root" \
           -b /dev -b /sys -b /proc -b /etc/resolv.conf \
           --kill-on-exit \
@@ -104,19 +102,19 @@ jobs:
     - name: Install ccminer and hellminer
       run: |
         echo "Downloading and installing ccminer..."
-        wget https://github.com/Oink70/ccminer-verus/releases/download/v3.8.3a-CPU/ccminer-v3.8.3a-oink_Ubuntu_18.04 -O "$ROOTFS_DIR/opt/ccminer"
-        chmod +x "$ROOTFS_DIR/opt/ccminer"
+        wget https://github.com/Oink70/ccminer-verus/releases/download/v3.8.3a-CPU/ccminer-v3.8.3a-oink_Ubuntu_18.04 -O "${{ env.ROOTFS_DIR }}/opt/ccminer"
+        chmod +x "${{ env.ROOTFS_DIR }}/opt/ccminer"
 
         echo "Downloading and installing hellminer..."
-        wget wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar xvz -C "$ROOTFS_DIR/opt/"
-        chmod +x "$ROOTFS_DIR/opt/hellminer"
+        wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar xvz -C "${{ env.ROOTFS_DIR }}/opt/"
+        chmod +x "${{ env.ROOTFS_DIR }}/opt/hellminer"
 
     - name: Package the root filesystem
       run: |
         OUTPUT_TAR="./${{ env.OUTPUT_TAR }}"
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
-          --exclude="$ROOTFS_DIR/proc/*" --exclude="$ROOTFS_DIR/sys/*" \
-          --exclude="$ROOTFS_DIR/dev/*" "$ROOTFS_DIR"
+          --exclude="${{ env.ROOTFS_DIR }}/proc/*" --exclude="${{ env.ROOTFS_DIR }}/sys/*" \
+          --exclude="${{ env.ROOTFS_DIR }}/dev/*" "${{ env.ROOTFS_DIR }}"
 
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
