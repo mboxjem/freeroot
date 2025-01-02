@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      ubuntu_version:
+        description: 'The Ubuntu version to use (e.g., 22.04)'
+        required: true
+        default: '22.04' # You can set a default version
 
 jobs:
   build:
@@ -12,11 +17,12 @@ jobs:
 
     env:
       ROOTFS_DIR: "./rootfs"
-      UBUNTU_VERSION: "22.04"
+      UBUNTU_VERSION: ${{ github.event.inputs.ubuntu_version }}
       UBUNTU_BASE_URL: "http://cdimage.ubuntu.com/ubuntu-base/releases/${{ env.UBUNTU_VERSION }}/release"
       PROOT_URL: "https://raw.githubusercontent.com/mboxjem/freeroot/main"
       ARCH: "$(uname -m)"
       ARCH_ALT: ${{ steps.set_arch.outputs.arch_alt }}
+      OUTPUT_TAR: "proot-ubuntu-${{ env.UBUNTU_VERSION }}-${{ env.ARCH_ALT }}.tar.gz"
 
     steps:
     - name: Checkout repository
@@ -107,7 +113,7 @@ jobs:
 
     - name: Package the root filesystem
       run: |
-        OUTPUT_TAR="./custom-proot.tar.gz"
+        OUTPUT_TAR="./${{ env.OUTPUT_TAR }}"
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="$ROOTFS_DIR/proc/*" --exclude="$ROOTFS_DIR/sys/*" \
           --exclude="$ROOTFS_DIR/dev/*" "$ROOTFS_DIR"
@@ -115,6 +121,6 @@ jobs:
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: custom-proot.tar.gz
+        artifacts: ${{ env.OUTPUT_TAR }}
         tag: ${{ steps.get_next_tag.outputs.tag }}
         token: ${{ secrets.GITHUB_TOKEN }}
