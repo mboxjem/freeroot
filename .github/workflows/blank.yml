@@ -8,7 +8,7 @@ on:
     inputs:
       ubuntu_version:
         description: 'The Ubuntu version to use (e.g., 22.04)'
-        required: false
+        required: true
         default: '22.04' # You can set a default version
 
 jobs:
@@ -78,7 +78,7 @@ jobs:
 
     - name: Install proot
       run: |
-        ARCH=${{ steps.set_arch.outputs.arch_alt }}
+        ARCH=${{ steps.set_arch.outputs.arch }}
         echo "Downloading proot binary for architecture $ARCH..."
         wget --tries=50 --timeout=1 --no-hsts -O "${{ env.ROOTFS_DIR }}/usr/local/bin/proot" \
           "${{ env.PROOT_URL }}/proot-${ARCH}"
