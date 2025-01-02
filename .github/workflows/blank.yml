@@ -66,8 +66,7 @@ jobs:
 
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: ncipollo/release-action@main
       with:
-        files: custom-proot.tar.gz
-      env:
-        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        artifacts: custom-proot.tar.gz
+        token: ${{ secrets.GITHUB_TOKEN }}
