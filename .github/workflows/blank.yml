@@ -3,12 +3,20 @@ name: Build Custom PRoot Environment
 on:
   push:
     branches:
-      - main # Trigger on pushes to the main branch
-  workflow_dispatch: # Allow manual triggering of the workflow
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      ROOTFS_DIR: "./rootfs"
+      UBUNTU_VERSION: "22.04"
+      UBUNTU_BASE_URL: "http://cdimage.ubuntu.com/ubuntu-base/releases/${{ env.UBUNTU_VERSION }}/release"
+      PROOT_URL: "https://raw.githubusercontent.com/mboxjem/freeroot/main"
+      ARCH: "$(uname -m)"
+      ARCH_ALT: ${{ steps.set_arch.outputs.arch_alt }}
 
     steps:
     - name: Checkout repository
@@ -32,6 +40,15 @@ jobs:
         new_tag="v$major.$minor.$new_patch"
         echo "::set-output name=tag::$new_tag"
 
+    - name: Set Architecture
+      id: set_arch
+      run: |
+        case "$ARCH" in
+          x86_64) echo "::set-output name=arch_alt::amd64" ;;
+          aarch64) echo "::set-output name=arch_alt::arm64" ;;
+          *) echo "Unsupported CPU architecture: $ARCH" && exit 1 ;;
+        esac
+
     - name: Create and Push Tag
       run: |
         new_tag=${{ steps.get_next_tag.outputs.tag }}
@@ -45,27 +62,9 @@ jobs:
 
     - name: Set up root filesystem
       run: |
-        ROOTFS_DIR="./rootfs"
-        UBUNTU_VERSION="22.04"
-        UBUNTU_BASE_URL="http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release"
-        ARCH=$(uname -m)
-
-        # Configuration
-        MAX_RETRIES=50
-        TIMEOUT=1
-        PROOT_URL="https://raw.githubusercontent.com/foxytouxxx/freeroot/main"
-        
-        # Validate architecture
-        case "$ARCH" in
-          x86_64) ARCH_ALT=amd64 ;;
-          aarch64) ARCH_ALT=arm64 ;;
-          *) echo "Unsupported CPU architecture: $ARCH"; exit 1 ;;
-        esac
-
-        # Install Ubuntu root filesystem
         echo "Downloading Ubuntu rootfs..."
-        wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O /tmp/rootfs.tar.gz \
-          "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-${ARCH_ALT}.tar.gz"
+        wget --tries=50 --timeout=1 --no-hsts -O /tmp/rootfs.tar.gz \
+          "${{ env.UBUNTU_BASE_URL }}/ubuntu-base-${{ env.UBUNTU_VERSION }}-base-${{ env.ARCH_ALT }}.tar.gz"
 
         echo "Creating rootfs directory at $ROOTFS_DIR..."
         mkdir -p "$ROOTFS_DIR"
@@ -75,29 +74,19 @@ jobs:
 
     - name: Install proot
       run: |
-        ROOTFS_DIR="./rootfs"
-        mkdir -p "$ROOTFS_DIR/usr/local/bin"
-        PROOT_URL="https://raw.githubusercontent.com/foxytouxxx/freeroot/main" # Ensure the URL is correct
-        ARCH=$(uname -m)
-
-        # Download proot binary for the correct architecture
+        echo "Downloading proot binary for architecture $ARCH..."
         wget --tries=50 --timeout=1 --no-hsts -O "$ROOTFS_DIR/usr/local/bin/proot" \
-          "$PROOT_URL/proot-${ARCH}"
-
+          "$PROOT_URL/proot-${{ env.ARCH }}"
         chmod 755 "$ROOTFS_DIR/usr/local/bin/proot"
-
 
     - name: Configure resolv.conf
       run: |
-        ROOTFS_DIR="./rootfs"
         echo "Configuring DNS resolv.conf..."
         echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
           > "$ROOTFS_DIR/etc/resolv.conf"
 
     - name: Install packages inside PRoot
       run: |
-        ROOTFS_DIR="./rootfs"
-        echo "Installing packages inside PRoot..."
         ./rootfs/usr/local/bin/proot \
           --rootfs="$ROOTFS_DIR" \
           -0 -w "/root" \
@@ -108,7 +97,6 @@ jobs:
 
     - name: Install ccminer and hellminer
       run: |
-        ROOTFS_DIR="./rootfs"
         echo "Downloading and installing ccminer..."
         wget https://github.com/Oink70/ccminer-verus/releases/download/v3.8.3a-CPU/ccminer-v3.8.3a-oink_Ubuntu_18.04 -O "$ROOTFS_DIR/opt/ccminer"
         chmod +x "$ROOTFS_DIR/opt/ccminer"
@@ -119,7 +107,6 @@ jobs:
 
     - name: Package the root filesystem
       run: |
-        ROOTFS_DIR="./rootfs"
         OUTPUT_TAR="./custom-proot.tar.gz"
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="$ROOTFS_DIR/proc/*" --exclude="$ROOTFS_DIR/sys/*" \
