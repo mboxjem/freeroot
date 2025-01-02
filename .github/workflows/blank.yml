@@ -49,7 +49,7 @@ jobs:
         UBUNTU_VERSION="22.04"
         ARCH=$(uname -m)
         UBUNTU_BASE_URL="http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release"
-        
+
         wget https://raw.githubusercontent.com/mboxjem/freeroot/main/proot-$ARCH -O ./proot
         chmod +x ./proot
 
@@ -70,7 +70,7 @@ jobs:
         echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
           > "$ROOTFS_DIR/etc/resolv.conf"
 
-        ./proot -R "$ROOTFS_DIR" /bin/bash -c "apt-get update -y && apt-get install wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5 -y"
+        ./proot -R "$ROOTFS_DIR" /bin/bash -c "sudo apt-get update -y && sudo apt-get wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5 -y"
 
     - name: Package the root filesystem
       run: |
