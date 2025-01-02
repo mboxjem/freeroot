@@ -80,16 +80,9 @@ jobs:
         PROOT_URL="https://raw.githubusercontent.com/foxytouxxx/freeroot/main" # Ensure the URL is correct
         ARCH=$(uname -m)
 
-        # Check architecture
-        case "$ARCH" in
-          x86_64) ARCH_ALT=amd64 ;;
-          aarch64) ARCH_ALT=arm64 ;;
-          *) echo "Unsupported CPU architecture: $ARCH"; exit 1 ;;
-        esac
-
         # Download proot binary for the correct architecture
         wget --tries=50 --timeout=1 --no-hsts -O "$ROOTFS_DIR/usr/local/bin/proot" \
-          "$PROOT_URL/proot-${ARCH_ALT}"
+          "$PROOT_URL/proot-${ARCH}"
 
         chmod 755 "$ROOTFS_DIR/usr/local/bin/proot"
 
