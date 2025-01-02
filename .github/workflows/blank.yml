@@ -111,8 +111,10 @@ jobs:
         chmod +x "${{ env.ROOTFS_DIR }}/opt/hellminer"
 
     - name: Package the root filesystem
+      id: package
       run: |
-        OUTPUT_TAR="./proot-ubuntu-${{ github.event.inputs.ubuntu_version }}-${{ steps.set_arch.outputs.arch }}.tar.gz"
+        NAME_TAR="proot-ubuntu-${{ github.event.inputs.ubuntu_version }}-${{ steps.set_arch.outputs.arch }}.tar.gz"
+        OUTPUT_TAR="./$NAME_TAR"
         echo "Packaging the root filesystem into $OUTPUT_TAR..."
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="${{ env.ROOTFS_DIR }}/proc/*" --exclude="${{ env.ROOTFS_DIR }}/sys/*" \
@@ -121,6 +123,6 @@ jobs:
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: ${{ steps.package.outputs.OUTPUT_TAR }}
+        artifacts: ${{ steps.package.outputs.NAME_TAR }}
         tag: ${{ steps.get_next_tag.outputs.tag }}
         token: ${{ secrets.GITHUB_TOKEN }}
