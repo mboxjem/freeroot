@@ -78,7 +78,7 @@ jobs:
 
     - name: Install proot
       run: |
-        ARCH=${{ steps.set_arch.outputs.arch_alt }}
+        ARCH=${{ steps.set_arch.outputs.arch }}
         echo "Downloading proot binary for architecture $ARCH..."
         wget --tries=50 --timeout=1 --no-hsts -O "${{ env.ROOTFS_DIR }}/usr/local/bin/proot" \
           "${{ env.PROOT_URL }}/proot-${ARCH}"
