@@ -11,6 +11,15 @@ on:
         required: true
         default: '22.04' # You can set a default version
 
+env:
+  ROOTFS_DIR: "./rootfs"
+  UBUNTU_VERSION: ${{ github.event.inputs.ubuntu_version }}
+  UBUNTU_BASE_URL: "http://cdimage.ubuntu.com/ubuntu-base/releases/${{ env.UBUNTU_VERSION }}/release"
+  PROOT_URL: "https://raw.githubusercontent.com/mboxjem/freeroot/main"
+  ARCH: "$(uname -m)"
+  ARCH_ALT: ${{ steps.set_arch.outputs.arch_alt }}
+  OUTPUT_TAR: "proot-ubuntu-${{ env.UBUNTU_VERSION }}-${{ env.ARCH_ALT }}.tar.gz"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,7 +49,6 @@ jobs:
     - name: Set Architecture
       id: set_arch
       run: |
-        ARCH=$(uname -m)
         case "$ARCH" in
           x86_64) echo "::set-output name=arch_alt::amd64" ;;
           aarch64) echo "::set-output name=arch_alt::arm64" ;;
@@ -60,41 +68,31 @@ jobs:
 
     - name: Set up root filesystem
       run: |
-        UBUNTU_VERSION="${{ github.event.inputs.ubuntu_version }}"
-        UBUNTU_BASE_URL="http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release"
-        ARCH_ALT="${{ steps.set_arch.outputs.arch_alt }}"
-
         echo "Downloading Ubuntu rootfs..."
         wget --tries=50 --timeout=1 --no-hsts -O /tmp/rootfs.tar.gz \
-          "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-${ARCH_ALT}.tar.gz"
+          "${{ env.UBUNTU_BASE_URL }}/ubuntu-base-${{ env.UBUNTU_VERSION }}-base-${{ env.ARCH_ALT }}.tar.gz"
 
-        echo "Creating rootfs directory..."
-        mkdir -p "./rootfs"
+        echo "Creating rootfs directory at $ROOTFS_DIR..."
+        mkdir -p "$ROOTFS_DIR"
 
-        echo "Extracting rootfs to ./rootfs..."
-        tar -xf /tmp/rootfs.tar.gz -C ./rootfs
+        echo "Extracting rootfs to $ROOTFS_DIR..."
+        tar -xf /tmp/rootfs.tar.gz -C "$ROOTFS_DIR"
 
     - name: Install proot
       run: |
-        ROOTFS_DIR="./rootfs"
-        PROOT_URL="https://raw.githubusercontent.com/mboxjem/freeroot/main"
-        ARCH="${{ steps.set_arch.outputs.arch_alt }}"
-
         echo "Downloading proot binary for architecture $ARCH..."
         wget --tries=50 --timeout=1 --no-hsts -O "$ROOTFS_DIR/usr/local/bin/proot" \
-          "$PROOT_URL/proot-${ARCH}"
+          "$PROOT_URL/proot-${{ env.ARCH }}"
         chmod 755 "$ROOTFS_DIR/usr/local/bin/proot"
 
     - name: Configure resolv.conf
       run: |
-        ROOTFS_DIR="./rootfs"
         echo "Configuring DNS resolv.conf..."
         echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
           > "$ROOTFS_DIR/etc/resolv.conf"
 
     - name: Install packages inside PRoot
       run: |
-        ROOTFS_DIR="./rootfs"
         ./rootfs/usr/local/bin/proot \
           --rootfs="$ROOTFS_DIR" \
           -0 -w "/root" \
@@ -105,23 +103,17 @@ jobs:
 
     - name: Install ccminer and hellminer
       run: |
-        ROOTFS_DIR="./rootfs"
         echo "Downloading and installing ccminer..."
         wget https://github.com/Oink70/ccminer-verus/releases/download/v3.8.3a-CPU/ccminer-v3.8.3a-oink_Ubuntu_18.04 -O "$ROOTFS_DIR/opt/ccminer"
         chmod +x "$ROOTFS_DIR/opt/ccminer"
 
         echo "Downloading and installing hellminer..."
-        wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar xvz -C "$ROOTFS_DIR/opt/"
+        wget wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar xvz -C "$ROOTFS_DIR/opt/"
         chmod +x "$ROOTFS_DIR/opt/hellminer"
 
     - name: Package the root filesystem
       run: |
-        ROOTFS_DIR="./rootfs"
-        UBUNTU_VERSION="${{ github.event.inputs.ubuntu_version }}"
-        ARCH_ALT="${{ steps.set_arch.outputs.arch_alt }}"
-        OUTPUT_TAR="proot-ubuntu-${UBUNTU_VERSION}-${ARCH_ALT}.tar.gz"
-
-        echo "Packaging the root filesystem..."
+        OUTPUT_TAR="./${{ env.OUTPUT_TAR }}"
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="$ROOTFS_DIR/proc/*" --exclude="$ROOTFS_DIR/sys/*" \
           --exclude="$ROOTFS_DIR/dev/*" "$ROOTFS_DIR"
@@ -129,6 +121,6 @@ jobs:
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: ${{ steps.package.outputs.output_tar }}
+        artifacts: ${{ env.OUTPUT_TAR }}
         tag: ${{ steps.get_next_tag.outputs.tag }}
         token: ${{ secrets.GITHUB_TOKEN }}
