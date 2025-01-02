@@ -126,7 +126,7 @@ jobs:
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="${{ env.ROOTFS_DIR }}/proc/*" --exclude="${{ env.ROOTFS_DIR }}/sys/*" \
           --exclude="${{ env.ROOTFS_DIR }}/dev/*" --transform='s,^,rootfs/,' "${{ env.ROOTFS_DIR }}"
-        tar -rf "$OUTPUT_TAR" ./run.sh
+        tar --append --file="$OUTPUT_TAR" ./run.sh
 
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
