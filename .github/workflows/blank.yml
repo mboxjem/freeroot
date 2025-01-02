@@ -125,8 +125,7 @@ jobs:
         echo "Packaging the root filesystem and run.sh script into $OUTPUT_TAR..."
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="${{ env.ROOTFS_DIR }}/proc/*" --exclude="${{ env.ROOTFS_DIR }}/sys/*" \
-          --exclude="${{ env.ROOTFS_DIR }}/dev/*" --transform='s,^,rootfs/,' "${{ env.ROOTFS_DIR }}"
-        tar --append --file="$OUTPUT_TAR" ./run.sh
+          --exclude="${{ env.ROOTFS_DIR }}/dev/*" --transform='s,^,rootfs/,' "${{ env.ROOTFS_DIR }}" ./run.sh
 
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
