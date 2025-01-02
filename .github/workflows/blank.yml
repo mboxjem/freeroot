@@ -22,36 +22,20 @@ jobs:
     - name: Determine Next Tag
       id: get_next_tag
       run: |
-        # Fetch all tags
         git fetch --tags
-
-        # Get the latest tag
         latest_tag=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
-
-        # Extract version components
         IFS='.' read -r -a version_parts <<< "${latest_tag#v}"
         major=${version_parts[0]}
         minor=${version_parts[1]}
         patch=${version_parts[2]}
-
-        # Increment the patch version
         new_patch=$((patch + 1))
         new_tag="v$major.$minor.$new_patch"
-
-        echo "Latest tag: $latest_tag"
-        echo "New tag: $new_tag"
-
-        # Set the new tag as output
         echo "::set-output name=tag::$new_tag"
 
     - name: Create and Push Tag
       run: |
         new_tag=${{ steps.get_next_tag.outputs.tag }}
-        
-        # Create a new tag
         git tag "$new_tag"
-        
-        # Push the tag
         git push origin "$new_tag"
 
     - name: Install dependencies
@@ -65,11 +49,12 @@ jobs:
         UBUNTU_VERSION="22.04"
         ARCH=$(uname -m)
         UBUNTU_BASE_URL="http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release"
+        
+        wget https://raw.githubusercontent.com/mboxjem/freeroot/main/proot-$ARCH -O ./proot
+        chmod +x ./proot
 
-        # Create root filesystem directory
         mkdir -p "$ROOTFS_DIR"
 
-        # Download and extract Ubuntu base tarball
         case "$ARCH" in
           x86_64) ARCH_ALT=amd64 ;;
           aarch64) ARCH_ALT=arm64 ;;
@@ -82,21 +67,15 @@ jobs:
     - name: Configure and install packages in rootfs
       run: |
         ROOTFS_DIR="./proot-rootfs"
-
         echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
           > "$ROOTFS_DIR/etc/resolv.conf"
-        
-        wget https://github.com/Oink70/ccminer-verus/releases/download/v3.8.3a-CPU/ccminer-v3.8.3a-oink_Ubuntu_18.04 -O "$ROOTFS_DIR/opt/ccminer" &&
-        chmod +x "$ROOTFS_DIR"/opt/ccminer &&
-        wget https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz -O /opt/hellminer.tar.gz &&
-        tar -xvf /opt/hellminer.tar.gz -C "$ROOTFS_DIR/opt/" &&
-        chmod +x "$ROOTFS_DIR"/opt/hellminer
+
+        ./proot -R "$ROOTFS_DIR" /bin/bash -c "apt-get update -y && apt-get install wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5 -y"
 
     - name: Package the root filesystem
       run: |
         ROOTFS_DIR="./proot-rootfs"
         OUTPUT_TAR="./custom-proot.tar.gz"
-
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="$ROOTFS_DIR/proc/*" --exclude="$ROOTFS_DIR/sys/*" \
           --exclude="$ROOTFS_DIR/dev/*" "$ROOTFS_DIR"
