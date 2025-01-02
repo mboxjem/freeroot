@@ -85,4 +85,5 @@ exec "$rootfs_dir/usr/local/bin/proot" \
   -0 -w "/root" \
   -b /dev -b /sys -b /proc -b /etc/resolv.conf \
   --kill-on-exit \
-  "$command_to_run"
+  /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  sh -c "$command_to_run"
