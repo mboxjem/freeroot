@@ -110,16 +110,29 @@ jobs:
         wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar xvz -C "${{ env.ROOTFS_DIR }}/opt/"
         chmod +x "${{ env.ROOTFS_DIR }}/opt/hellminer"
 
-    - name: Package the root filesystem
+    - name: Add run.sh script outside rootfs
+      run: |
+        echo "Creating run.sh script outside rootfs directory..."
+        cat << 'EOF' > "./run.sh"
+#!/bin/sh
+
+rootfs_dir="./rootfs"
+command_to_run=${1:-/bin/sh}
+exec "$rootfs_dir/usr/local/bin/proot" --rootfs="$rootfs_dir" -0 -w "/root" -b /dev -b /sys -b /proc -b /etc/resolv.conf --kill-on-exit /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin sh -c "$command_to_run"
+EOF
+        chmod +x "./run.sh"
+
+    - name: Package the root filesystem and run.sh
       id: package
       run: |
         NAME_TAR="proot-ubuntu-${{ github.event.inputs.ubuntu_version }}-${{ steps.set_arch.outputs.arch }}.tar.gz"
         OUTPUT_TAR="./$NAME_TAR"
         echo "::set-output name=name_tar::$NAME_TAR"
-        echo "Packaging the root filesystem into $OUTPUT_TAR..."
+        echo "Packaging the root filesystem and run.sh script into $OUTPUT_TAR..."
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="${{ env.ROOTFS_DIR }}/proc/*" --exclude="${{ env.ROOTFS_DIR }}/sys/*" \
-          --exclude="${{ env.ROOTFS_DIR }}/dev/*" "${{ env.ROOTFS_DIR }}"
+          --exclude="${{ env.ROOTFS_DIR }}/dev/*" --transform='s,^,rootfs/,' "${{ env.ROOTFS_DIR }}"
+        tar -rf "$OUTPUT_TAR" ./run.sh
 
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
