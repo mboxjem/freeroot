@@ -112,7 +112,7 @@ jobs:
 
     - name: Package the root filesystem
       run: |
-        OUTPUT_TAR="proot-ubuntu-${{ github.event.inputs.ubuntu_version }}-${{ steps.set_arch.outputs.arch_alt }}.tar.gz"
+        OUTPUT_TAR="proot-ubuntu-${{ github.event.inputs.ubuntu_version }}-${{ steps.set_arch.outputs.arch }}.tar.gz"
         echo "Packaging the root filesystem into $OUTPUT_TAR..."
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="${{ env.ROOTFS_DIR }}/proc/*" --exclude="${{ env.ROOTFS_DIR }}/sys/*" \
@@ -121,6 +121,6 @@ jobs:
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: ${{ steps.package.outputs.OUTPUT_TAR }}
+        files: ${{ github.workspace }}/$OUTPUT_TAR  # Reference the file path here
         tag: ${{ steps.get_next_tag.outputs.tag }}
         token: ${{ secrets.GITHUB_TOKEN }}
