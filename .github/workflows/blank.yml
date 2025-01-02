@@ -45,40 +45,77 @@ jobs:
 
     - name: Set up root filesystem
       run: |
-        ROOTFS_DIR="./proot-rootfs"
+        export ROOTFS_DIR="./rootfs"
         UBUNTU_VERSION="22.04"
-        ARCH=$(uname -m)
         UBUNTU_BASE_URL="http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release"
+        ARCH=$(uname -m)
 
-        wget https://raw.githubusercontent.com/mboxjem/freeroot/main/proot-$ARCH -O ./proot
-        chmod +x ./proot
-
-        mkdir -p "$ROOTFS_DIR"
-
+        # Configuration
+        MAX_RETRIES=50
+        TIMEOUT=1
+        PROOT_URL="https://raw.githubusercontent.com/foxytouxxx/freeroot/main"
+        
+        # Validate architecture
         case "$ARCH" in
           x86_64) ARCH_ALT=amd64 ;;
           aarch64) ARCH_ALT=arm64 ;;
           *) echo "Unsupported CPU architecture: $ARCH"; exit 1 ;;
         esac
 
-        wget "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-$ARCH_ALT.tar.gz" -O /tmp/rootfs.tar.gz
+        # Install Ubuntu root filesystem
+        echo "Downloading Ubuntu rootfs..."
+        wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O /tmp/rootfs.tar.gz \
+          "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-${ARCH_ALT}.tar.gz"
+
+        echo "Creating rootfs directory at $ROOTFS_DIR..."
+        mkdir -p "$ROOTFS_DIR"
+
+        echo "Extracting rootfs to $ROOTFS_DIR..."
         tar -xf /tmp/rootfs.tar.gz -C "$ROOTFS_DIR"
 
-    - name: Configure and install packages in rootfs
+    - name: Install proot
       run: |
-        ROOTFS_DIR="./proot-rootfs"
-        echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
-          > "$ROOTFS_DIR/etc/resolv.conf"
+        mkdir -p "$ROOTFS_DIR/usr/local/bin"
+        wget --tries=50 --timeout=1 --no-hsts -O "$ROOTFS_DIR/usr/local/bin/proot" \
+          "$PROOT_URL/proot-${ARCH}"
 
-        ./proot -R "$ROOTFS_DIR" /bin/sh -c "
-          export DEBIAN_FRONTEND=noninteractive && \
-          apt-get update -y && \
-          apt-get install -y wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5 && \
-          apt-get clean && rm -rf /var/lib/apt/lists/*"
+        chmod 755 "$ROOTFS_DIR/usr/local/bin/proot"
+
+    - name: Configure resolv.conf
+      run: |
+        ROOTFS_DIR="./rootfs"
+        echo "Configuring DNS resolv.conf..."
+        cat > "$ROOTFS_DIR/etc/resolv.conf" <<EOF
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOF
+
+    - name: Install packages inside PRoot
+      run: |
+        echo "Installing packages inside PRoot..."
+        ./rootfs/usr/local/bin/proot \
+          --rootfs="$ROOTFS_DIR" \
+          -0 -w "/root" \
+          -b /dev -b /sys -b /proc -b /etc/resolv.conf \
+          --kill-on-exit \
+          /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+          bash -c "apt-get update -y && apt-get install -y wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5"
+
+    - name: Install ccminer and hellminer
+      run: |
+        echo "Downloading and installing ccminer..."
+        wget https://github.com/Oink70/ccminer-verus/releases/download/v3.8.3a-CPU/ccminer-v3.8.3a-oink_Ubuntu_18.04 -O "$ROOTFS_DIR/opt/ccminer" &&
+        chmod +x "$ROOTFS_DIR/opt/ccminer"
+
+        echo "Downloading and installing hellminer..."
+        wget https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz -O /opt/hellminer.tar.gz &&
+        tar -xvf /opt/hellminer.tar.gz -C "$ROOTFS_DIR/opt/" &&
+        chmod +x "$ROOTFS_DIR/opt/hellminer"
 
     - name: Package the root filesystem
       run: |
-        ROOTFS_DIR="./proot-rootfs"
         OUTPUT_TAR="./custom-proot.tar.gz"
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="$ROOTFS_DIR/proc/*" --exclude="$ROOTFS_DIR/sys/*" \
