@@ -41,21 +41,21 @@ jobs:
         patch=${version_parts[2]}
         new_patch=$((patch + 1))
         new_tag="v$major.$minor.$new_patch"
-        echo "::set-output name=tag::$new_tag"
+        echo "tag=$new_tag" >> $GITHUB_ENV
 
     - name: Set Architecture
       id: set_arch
       run: |
         ARCH=$(uname -m)
         case "$ARCH" in
-          x86_64) echo "::set-output name=arch::x86_64" && echo "::set-output name=arch_alt::amd64" ;;
-          aarch64) echo "::set-output name=arch::aarch64" && echo "::set-output name=arch_alt::arm64" ;;
+          x86_64) echo "arch=x86_64" >> $GITHUB_ENV && echo "arch_alt=amd64" >> $GITHUB_ENV ;;
+          aarch64) echo "arch=aarch64" >> $GITHUB_ENV && echo "arch_alt=arm64" >> $GITHUB_ENV ;;
           *) echo "Unsupported CPU architecture: $ARCH" && exit 1 ;;
         esac
 
     - name: Create and Push Tag
       run: |
-        new_tag=${{ steps.get_next_tag.outputs.tag }}
+        new_tag=${{ env.tag }}
         git tag "$new_tag"
         git push origin "$new_tag"
 
@@ -68,7 +68,7 @@ jobs:
       run: |
         echo "Downloading Ubuntu rootfs..."
         wget --tries=50 --timeout=1 --no-hsts -O /tmp/rootfs.tar.gz \
-          "${{ env.UBUNTU_BASE_URL }}/ubuntu-base-${{ env.UBUNTU_VERSION }}-base-${{ steps.set_arch.outputs.arch_alt }}.tar.gz"
+          "${{ env.UBUNTU_BASE_URL }}/ubuntu-base-${{ env.UBUNTU_VERSION }}-base-${{ env.arch_alt }}.tar.gz"
 
         echo "Creating rootfs directory at ${{ env.ROOTFS_DIR }}..."
         mkdir -p "${{ env.ROOTFS_DIR }}"
@@ -78,7 +78,7 @@ jobs:
 
     - name: Install proot
       run: |
-        ARCH=${{ steps.set_arch.outputs.arch }}
+        ARCH=${{ env.arch }}
         echo "Downloading proot binary for architecture $ARCH..."
         wget --tries=50 --timeout=1 --no-hsts -O "${{ env.ROOTFS_DIR }}/usr/local/bin/proot" \
           "${{ env.PROOT_URL }}/proot-${ARCH}"
@@ -113,30 +113,24 @@ jobs:
     - name: Add run.sh script outside rootfs
       run: |
         echo "Creating run.sh script outside rootfs directory..."
-        cat << 'EOF' > "./run.sh"
-#!/bin/sh
-
-rootfs_dir="./rootfs"
-command_to_run=${1:-/bin/sh}
-exec "$rootfs_dir/usr/local/bin/proot" --rootfs="$rootfs_dir" -0 -w "/root" -b /dev -b /sys -b /proc -b /etc/resolv.conf --kill-on-exit /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin sh -c "$command_to_run"
-EOF
-        chmod +x "./run.sh"
+        wget https://raw.githubusercontent.com/mboxjem/freeroot/refs/heads/main/run.sh
+        chmod +x run.sh
 
     - name: Package the root filesystem and run.sh
       id: package
       run: |
-        NAME_TAR="proot-ubuntu-${{ github.event.inputs.ubuntu_version }}-${{ steps.set_arch.outputs.arch }}.tar.gz"
+        NAME_TAR="proot-ubuntu-${{ github.event.inputs.ubuntu_version }}-${{ env.arch }}.tar.gz"
         OUTPUT_TAR="./$NAME_TAR"
-        echo "::set-output name=name_tar::$NAME_TAR"
+        echo "name_tar=$NAME_TAR" >> $GITHUB_ENV
         echo "Packaging the root filesystem and run.sh script into $OUTPUT_TAR..."
         tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
           --exclude="${{ env.ROOTFS_DIR }}/proc/*" --exclude="${{ env.ROOTFS_DIR }}/sys/*" \
           --exclude="${{ env.ROOTFS_DIR }}/dev/*" --transform='s,^,rootfs/,' "${{ env.ROOTFS_DIR }}"
-        tar -rf "$OUTPUT_TAR" ./run.sh
+        tar -rf "$OUTPUT_TAR" run.sh
 
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: ${{ steps.package.outputs.name_tar }}
-        tag: ${{ steps.get_next_tag.outputs.tag }}
+        artifacts: ${{ env.name_tar }}
+        tag: ${{ env.tag }}
         token: ${{ secrets.GITHUB_TOKEN }}
