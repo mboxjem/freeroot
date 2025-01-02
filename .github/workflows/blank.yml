@@ -49,37 +49,31 @@ jobs:
         UBUNTU_VERSION="22.04"
         UBUNTU_BASE_URL="http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release"
         ARCH=$(uname -m)
-
-        # Configuration
         MAX_RETRIES=50
         TIMEOUT=1
         PROOT_URL="https://raw.githubusercontent.com/foxytouxxx/freeroot/main"
-        
-        # Validate architecture
+
+        # Set architecture based on the system architecture
         case "$ARCH" in
           x86_64) ARCH_ALT=amd64 ;;
           aarch64) ARCH_ALT=arm64 ;;
           *) echo "Unsupported CPU architecture: $ARCH"; exit 1 ;;
         esac
 
-        # Install Ubuntu root filesystem
-        echo "Downloading Ubuntu rootfs..."
+        # Download and extract Ubuntu root filesystem
         wget --tries="$MAX_RETRIES" --timeout="$TIMEOUT" --no-hsts -O /tmp/rootfs.tar.gz \
           "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-${ARCH_ALT}.tar.gz"
-
-        echo "Creating rootfs directory at $ROOTFS_DIR..."
         mkdir -p "$ROOTFS_DIR"
-
-        echo "Extracting rootfs to $ROOTFS_DIR..."
         tar -xf /tmp/rootfs.tar.gz -C "$ROOTFS_DIR"
 
     - name: Install proot
       run: |
         ROOTFS_DIR="./rootfs"
         mkdir -p "$ROOTFS_DIR/usr/local/bin"
-        wget --tries=50 --timeout=1 --no-hsts -O "$ROOTFS_DIR/usr/local/bin/proot" \
-          "$PROOT_URL/proot-${ARCH}"
 
+        # Download proot for the correct architecture
+        wget --tries=50 --timeout=1 --no-hsts -O "$ROOTFS_DIR/usr/local/bin/proot" \
+          "$PROOT_URL/proot-${ARCH_ALT}"
         chmod 755 "$ROOTFS_DIR/usr/local/bin/proot"
 
     - name: Configure resolv.conf
@@ -109,7 +103,7 @@ jobs:
         chmod +x "$ROOTFS_DIR/opt/ccminer"
 
         echo "Downloading and installing hellminer..."
-        wget wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar -xvf -C "$ROOTFS_DIR/opt/"
+        wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar -xvf -C "$ROOTFS_DIR/opt/"
         chmod +x "$ROOTFS_DIR/opt/hellminer"
 
     - name: Package the root filesystem
