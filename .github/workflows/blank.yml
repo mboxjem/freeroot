@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v*' # Trigger workflow on versioned tags
-  workflow_dispatch:
+  workflow_dispatch: # Allow manual triggering of the workflow
 
 jobs:
   build:
@@ -17,16 +17,21 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget tar debootstrap
+        sudo apt-get install -y wget tar
 
     - name: Set up root filesystem
       run: |
         ROOTFS_DIR="./proot-rootfs"
         UBUNTU_VERSION="22.04"
         ARCH=$(uname -m)
+        UBUNTU_BASE_URL="http://cdimage.ubuntu.com/ubuntu-base/releases/$UBUNTU_VERSION/release"
 
-        # Create root filesystem using debootstrap
-        sudo debootstrap --arch="$ARCH" "$UBUNTU_VERSION" "$ROOTFS_DIR" http://archive.ubuntu.com/ubuntu
+        # Create root filesystem directory
+        mkdir -p "$ROOTFS_DIR"
+
+        # Download and extract Ubuntu base tarball
+        wget "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-${ARCH}.tar.gz" -O /tmp/rootfs.tar.gz
+        tar -xf /tmp/rootfs.tar.gz -C "$ROOTFS_DIR"
 
     - name: Configure and install packages in rootfs
       run: |
