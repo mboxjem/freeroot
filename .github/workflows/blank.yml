@@ -114,7 +114,7 @@ jobs:
         chmod +x "$ROOTFS_DIR/opt/ccminer"
 
         echo "Downloading and installing hellminer..."
-        wget wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar -xvf -C "$ROOTFS_DIR/opt/"
+        wget wget -qO- https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz | tar xvz -C "$ROOTFS_DIR/opt/"
         chmod +x "$ROOTFS_DIR/opt/hellminer"
 
     - name: Package the root filesystem
