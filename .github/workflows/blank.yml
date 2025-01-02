@@ -86,12 +86,8 @@ jobs:
       run: |
         ROOTFS_DIR="./rootfs"
         echo "Configuring DNS resolv.conf..."
-        cat > "$ROOTFS_DIR/etc/resolv.conf" <<EOF
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-nameserver 8.8.8.8
-nameserver 8.8.4.4
-EOF
+        echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
+          > "$ROOTFS_DIR/etc/resolv.conf"
 
     - name: Install packages inside PRoot
       run: |
