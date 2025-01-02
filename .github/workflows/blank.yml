@@ -121,6 +121,6 @@ jobs:
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: ${{ env.OUTPUT_TAR }}
+        artifacts: ${{ steps.package.outputs.OUTPUT_TAR }}
         tag: ${{ steps.get_next_tag.outputs.tag }}
         token: ${{ secrets.GITHUB_TOKEN }}
