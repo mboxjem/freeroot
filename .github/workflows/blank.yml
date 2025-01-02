@@ -1,0 +1,70 @@
+name: Build Custom PRoot Environment
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger workflow on versioned tags
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget tar debootstrap
+
+    - name: Set up root filesystem
+      run: |
+        ROOTFS_DIR="./proot-rootfs"
+        UBUNTU_VERSION="22.04"
+        ARCH=$(uname -m)
+
+        # Create root filesystem using debootstrap
+        sudo debootstrap --arch="$ARCH" "$UBUNTU_VERSION" "$ROOTFS_DIR" http://archive.ubuntu.com/ubuntu
+
+    - name: Configure and install packages in rootfs
+      run: |
+        ROOTFS_DIR="./proot-rootfs"
+
+        # Bind necessary directories for apt to work
+        sudo mount --bind /proc "$ROOTFS_DIR/proc"
+        sudo mount --bind /sys "$ROOTFS_DIR/sys"
+        sudo mount --bind /dev "$ROOTFS_DIR/dev"
+
+        # Install packages inside rootfs
+        sudo chroot "$ROOTFS_DIR" /bin/bash -c "
+          apt-get update &&
+          apt-get install -y wget tar p7zip-full libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5 &&
+          apt-get clean &&
+          wget https://github.com/Oink70/ccminer-verus/releases/download/v3.8.3a-CPU/ccminer-v3.8.3a-oink_Ubuntu_18.04 -O /opt/ccminer &&
+          chmod +x /opt/ccminer &&
+          wget https://github.com/hellcatz/hminer/releases/download/v0.59.1/hellminer_linux64.tar.gz -O /opt/hellminer.tar.gz &&
+          tar -xvf /opt/hellminer.tar.gz -C /opt/ &&
+          chmod +x /opt/hellminer
+        "
+
+        # Unmount directories
+        sudo umount "$ROOTFS_DIR/proc"
+        sudo umount "$ROOTFS_DIR/sys"
+        sudo umount "$ROOTFS_DIR/dev"
+
+    - name: Package the root filesystem
+      run: |
+        ROOTFS_DIR="./proot-rootfs"
+        OUTPUT_TAR="./custom-proot.tar.gz"
+
+        tar -czf "$OUTPUT_TAR" --exclude="$OUTPUT_TAR" \
+          --exclude="$ROOTFS_DIR/proc/*" --exclude="$ROOTFS_DIR/sys/*" \
+          --exclude="$ROOTFS_DIR/dev/*" "$ROOTFS_DIR"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: custom-proot.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
