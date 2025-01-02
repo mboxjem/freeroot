@@ -47,9 +47,10 @@ jobs:
       id: set_arch
       run: |
         ARCH=$(uname -m)
+        # multiple set outputs nam=arch and arch_alt
         case "$ARCH" in
-          x86_64) echo "::set-output name=arch_alt::amd64" ;;
-          aarch64) echo "::set-output name=arch_alt::arm64" ;;
+          x86_64) echo "::set-output name=arch::amd64" && echo "::set-output name=arch_alt::x86_64" ;;
+          aarch64) echo "::set-output name=arch::arm64" && echo "::set-output name=arch_alt::arm64" ;;
           *) echo "Unsupported CPU architecture: $ARCH" && exit 1 ;;
         esac
 
