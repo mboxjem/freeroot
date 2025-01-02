@@ -2,8 +2,8 @@ name: Build Custom PRoot Environment
 
 on:
   push:
-    tags:
-      - 'v*' # Trigger workflow on versioned tags
+    branches:
+      - main # Trigger on pushes to the main branch
   workflow_dispatch: # Allow manual triggering of the workflow
 
 jobs:
@@ -14,11 +14,48 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Setup Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Determine Next Tag
+      id: get_next_tag
+      run: |
+        # Fetch all tags
+        git fetch --tags
+
+        # Get the latest tag
+        latest_tag=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
+
+        # Extract version components
+        IFS='.' read -r -a version_parts <<< "${latest_tag#v}"
+        major=${version_parts[0]}
+        minor=${version_parts[1]}
+        patch=${version_parts[2]}
+
+        # Increment the patch version
+        new_patch=$((patch + 1))
+        new_tag="v$major.$minor.$new_patch"
+
+        echo "Latest tag: $latest_tag"
+        echo "New tag: $new_tag"
+
+        # Set the new tag as output
+        echo "::set-output name=tag::$new_tag"
+
+    - name: Create and Push Tag
+      run: |
+        new_tag=${{ steps.get_next_tag.outputs.tag }}
+        
+        # Create a new tag
+        git tag "$new_tag"
+        
+        # Push the tag
+        git push origin "$new_tag"
+
     - name: Install dependencies
       run: |
-        sudo mkdir -p /tmp/apt-tmp
-        sudo chmod 1777 /tmp/apt-tmp
-        export TMPDIR=/tmp/apt-tmp
         sudo apt-get update
         sudo apt-get install -y wget tar
 
@@ -65,8 +102,8 @@ jobs:
           --exclude="$ROOTFS_DIR/dev/*" "$ROOTFS_DIR"
 
     - name: Create GitHub Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: ncipollo/release-action@main
+      uses: ncipollo/release-action@v1
       with:
         artifacts: custom-proot.tar.gz
+        tag: ${{ steps.get_next_tag.outputs.tag }}
         token: ${{ secrets.GITHUB_TOKEN }}
