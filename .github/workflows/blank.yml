@@ -30,7 +30,13 @@ jobs:
         mkdir -p "$ROOTFS_DIR"
 
         # Download and extract Ubuntu base tarball
-        wget "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-${ARCH}.tar.gz" -O /tmp/rootfs.tar.gz
+        case "$ARCH" in
+          x86_64) ARCH_ALT=amd64 ;;
+          aarch64) ARCH_ALT=arm64 ;;
+          *) echo "Unsupported CPU architecture: $ARCH"; exit 1 ;;
+        esac
+
+        wget "$UBUNTU_BASE_URL/ubuntu-base-$UBUNTU_VERSION-base-$ARCH_ALT.tar.gz" -O /tmp/rootfs.tar.gz
         tar -xf /tmp/rootfs.tar.gz -C "$ROOTFS_DIR"
 
     - name: Configure and install packages in rootfs
