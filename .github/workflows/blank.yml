@@ -92,7 +92,7 @@ jobs:
         echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
           > "${{ env.ROOTFS_DIR }}/etc/resolv.conf"
 
-        - name: Install packages inside PRoot
+    - name: Install packages inside PRoot
       run: |
         "${{ env.ROOTFS_DIR }}/usr/local/bin/proot" \
           --rootfs="${{ env.ROOTFS_DIR }}" \
