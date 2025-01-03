@@ -11,7 +11,7 @@ on:
       ubuntu_version:
         description: 'The Ubuntu version to use (e.g., 22.04)'
         required: true
-        default: '22.04' # You can set a default version
+        default: '22.04'
 
 jobs:
   build:
@@ -101,19 +101,21 @@ jobs:
           --kill-on-exit \
           /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
           /bin/sh -c "
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+
             apt-get update -y && \
             apt-get install -y --no-install-recommends \
-              wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5 && \
+              wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev && \
             apt-get clean && \
-            rm -rf \
-              /var/lib/apt/lists/* \
-              /tmp/* \
-              /var/tmp/* \
-              /var/cache/apt/* \
-              /var/cache/debconf/* \
-              /var/cache/dpkg/* \
-              /var/log/* \
-              /var/backups/*"
+            rm -rf /var/lib/apt/lists/* /var/cache/* /var/tmp/* /tmp/* && \
+            rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/locale/* && \
+            find /usr/share -name '*.gz' -delete && \
+            find /usr/lib -type f \( -name '*.a' -o -name '*.la' \) -delete && \
+            rm -rf /usr/lib/python* /usr/share/perl* /usr/bin/perl && \
+            find /usr/lib /usr/bin /usr/sbin /bin /sbin -type f -exec strip --strip-all '{}' + || true && \
+            rm -rf /var/log/* /var/backups/* /etc/apt/apt.conf.d/* /etc/apt/preferences.d/*
+          "
 
     - name: Install ccminer and hellminer
       run: |
