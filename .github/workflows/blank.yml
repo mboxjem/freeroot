@@ -92,7 +92,7 @@ jobs:
         echo -e "nameserver 1.1.1.1\nnameserver 1.0.0.1\nnameserver 8.8.8.8\nnameserver 8.8.4.4" \
           > "${{ env.ROOTFS_DIR }}/etc/resolv.conf"
 
-    - name: Install packages inside PRoot
+        - name: Install packages inside PRoot
       run: |
         "${{ env.ROOTFS_DIR }}/usr/local/bin/proot" \
           --rootfs="${{ env.ROOTFS_DIR }}" \
@@ -100,7 +100,20 @@ jobs:
           -b /dev -b /sys -b /proc -b /etc/resolv.conf \
           --kill-on-exit \
           /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-          /bin/sh -c "apt-get update -y && apt-get install -y wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5 && apt-get clean && rm -rf /var/lib/apt/lists/*"
+          /bin/sh -c "
+            apt-get update -y && \
+            apt-get install -y --no-install-recommends \
+              wget libsodium-dev libcurl4-openssl-dev libssl-dev libjansson-dev libomp5 && \
+            apt-get clean && \
+            rm -rf \
+              /var/lib/apt/lists/* \
+              /tmp/* \
+              /var/tmp/* \
+              /var/cache/apt/* \
+              /var/cache/debconf/* \
+              /var/cache/dpkg/* \
+              /var/log/* \
+              /var/backups/*"
 
     - name: Install ccminer and hellminer
       run: |
