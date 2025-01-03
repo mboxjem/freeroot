@@ -112,8 +112,6 @@ jobs:
             rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/locale/* && \
             find /usr/share -name '*.gz' -delete && \
             find /usr/lib -type f \( -name '*.a' -o -name '*.la' \) -delete && \
-            rm -rf /usr/lib/python* /usr/share/perl* /usr/bin/perl && \
-            find /usr/lib /usr/bin /usr/sbin /bin /sbin -type f -exec strip --strip-all '{}' + || true && \
             rm -rf /var/log/* /var/backups/* /etc/apt/apt.conf.d/* /etc/apt/preferences.d/*
           "
 
